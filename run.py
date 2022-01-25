@@ -11,15 +11,9 @@ import PIL.Image
 import sys
 import typing
 
-try:
-    from .sepconv import sepconv # the custom separable convolution layer
-except:
-    sys.path.insert(0, './sepconv'); import sepconv # you should consider upgrading python
-# end
+import sepconv # the custom separable convolution layer
 
 ##########################################################
-
-assert(int(str('').join(torch.__version__.split('.')[0:2])) >= 13) # requires at least pytorch version 1.3.0
 
 torch.set_grad_enabled(False) # make sure to not compute gradients for computational performance
 
@@ -33,7 +27,7 @@ arguments_strTwo = './images/two.png'
 arguments_strVideo = './videos/car-turn.mp4'
 arguments_strOut = './out.png'
 
-for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [ strParameter[2:] + '=' for strParameter in sys.argv[1::2] ])[0]:
+for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [strParameter[2:] + '=' for strParameter in sys.argv[1::2]])[0]:
     if strOption == '--model' and strArgument != '': arguments_strModel = strArgument # which model to use
     if strOption == '--one' and strArgument != '': arguments_strOne = strArgument # path to the first frame
     if strOption == '--two' and strArgument != '': arguments_strTwo = strArgument # path to the second frame
@@ -454,7 +448,7 @@ def estimate(tenOne, tenTwo):
 ##########################################################
 
 if __name__ == '__main__':
-    if arguments_strOut.split('.')[-1] in [ 'bmp', 'jpg', 'jpeg', 'png' ]:
+    if arguments_strOut.split('.')[-1] in ['bmp', 'jpg', 'jpeg', 'png']:
         tenOne = torch.FloatTensor(numpy.ascontiguousarray(numpy.array(PIL.Image.open(arguments_strOne))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0)))
         tenTwo = torch.FloatTensor(numpy.ascontiguousarray(numpy.array(PIL.Image.open(arguments_strTwo))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0)))
 
@@ -462,7 +456,7 @@ if __name__ == '__main__':
 
         PIL.Image.fromarray((tenOutput.clip(0.0, 1.0).numpy().transpose(1, 2, 0)[:, :, ::-1] * 255.0).astype(numpy.uint8)).save(arguments_strOut)
 
-    elif arguments_strOut.split('.')[-1] in [ 'avi', 'mp4', 'webm', 'wmv' ]:
+    elif arguments_strOut.split('.')[-1] in ['avi', 'mp4', 'webm', 'wmv']:
         import moviepy
         import moviepy.editor
         import moviepy.video.io.ffmpeg_writer
@@ -472,7 +466,7 @@ if __name__ == '__main__':
         intWidth = objVideoreader.w
         intHeight = objVideoreader.h
 
-        tenFrames = [ None, None, None, None, None ]
+        tenFrames = [None, None, None, None, None]
 
         with moviepy.video.io.ffmpeg_writer.FFMPEG_VideoWriter(filename=arguments_strOut, size=(intWidth, intHeight), fps=objVideoreader.fps) as objVideowriter:
             for npyFrame in objVideoreader.iter_frames():

@@ -1,5 +1,5 @@
 # revisiting-sepconv
-This is a reference implementation of Revisiting Adaptive Convolutions for Video Frame Interpolation [1] using PyTorch. Given two frames, it will make use of [adaptive convolution](http://sniklaus.com/papers/adaconv) [2] in a separable manner [3] to interpolate the intermediate frame. Should you be making use of our work, please cite our paper [1].
+This is a reference implementation of Revisiting Adaptive Convolutions for Video Frame Interpolation [1] using PyTorch. Given two frames, it will make use of [adaptive convolution](http://sniklaus.com/papers/adaconv) [2] in a [separable manner](http://sniklaus.com/papers/sepconv) [3] to interpolate the intermediate frame. Should you be making use of our work, please cite our paper [1].
 
 <a href="https://arxiv.org/abs/2011.01280" rel="Paper"><img src="http://content.sniklaus.com/resepconv/paper.jpg" alt="Paper" width="100%"></a>
 

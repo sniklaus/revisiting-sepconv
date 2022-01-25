@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import collections
 import cupy
 import os
 import re
@@ -128,6 +129,45 @@ def cuda_kernel(strFunction:str, strKernel:str, objVariables:typing.Dict):
         # end
 
         while True:
+            objMatch = re.search('(OFFSET_)([0-4])(\()', strKernel)
+
+            if objMatch is None:
+                break
+            # end
+
+            intStart = objMatch.span()[1]
+            intStop = objMatch.span()[1]
+            intParentheses = 1
+
+            while True:
+                intParentheses += 1 if strKernel[intStop] == '(' else 0
+                intParentheses -= 1 if strKernel[intStop] == ')' else 0
+
+                if intParentheses == 0:
+                    break
+                # end
+
+                intStop += 1
+            # end
+
+            intArgs = int(objMatch.group(2))
+            strArgs = strKernel[intStart:intStop].split(',')
+
+            assert(intArgs == len(strArgs) - 1)
+
+            strTensor = strArgs[0]
+            intStrides = objVariables[strTensor].stride()
+
+            strIndex = []
+
+            for intArg in range(intArgs):
+                strIndex.append('((' + strArgs[intArg + 1].replace('{', '(').replace('}', ')').strip() + ')*' + str(intStrides[intArg]) + ')')
+            # end
+
+            strKernel = strKernel.replace('OFFSET_' + str(intArgs) + '(' + strKernel[intStart:intStop] + ')', '(' + str.join('+', strIndex) + ')')
+        # end
+
+        while True:
             objMatch = re.search('(VALUE_)([0-4])(\()', strKernel)
 
             if objMatch is None:
@@ -235,7 +275,8 @@ class sepconv_func(torch.autograd.Function):
             }))(
                 grid=tuple([int((tenOut.nelement() + 512 - 1) / 512), 1, 1]),
                 block=tuple([512, 1, 1]),
-                args=[cuda_int32(tenOut.nelement()), tenIn.data_ptr(), tenVer.data_ptr(), tenHor.data_ptr(), tenOut.data_ptr()]
+                args=[cuda_int32(tenOut.nelement()), tenIn.data_ptr(), tenVer.data_ptr(), tenHor.data_ptr(), tenOut.data_ptr()],
+                stream=collections.namedtuple('Stream', 'ptr')(torch.cuda.current_stream().cuda_stream)
             )
 
         elif tenIn.is_cuda != True:
@@ -315,7 +356,8 @@ class sepconv_func(torch.autograd.Function):
             }))(
                 grid=tuple([int((tenIngrad.nelement() + 512 - 1) / 512), 1, 1]),
                 block=tuple([512, 1, 1]),
-                args=[cuda_int32(tenIngrad.nelement()), tenIn.data_ptr(), tenVer.data_ptr(), tenHor.data_ptr(), tenOutgrad.data_ptr(), tenIngrad.data_ptr(), None, None]
+                args=[cuda_int32(tenIngrad.nelement()), tenIn.data_ptr(), tenVer.data_ptr(), tenHor.data_ptr(), tenOutgrad.data_ptr(), tenIngrad.data_ptr(), None, None],
+                stream=collections.namedtuple('Stream', 'ptr')(torch.cuda.current_stream().cuda_stream)
             )
         # end
 
@@ -365,7 +407,8 @@ class sepconv_func(torch.autograd.Function):
             }))(
                 grid=tuple([int((tenVergrad.nelement() + 512 - 1) / 512), 1, 1]),
                 block=tuple([512, 1, 1]),
-                args=[cuda_int32(tenVergrad.nelement()), tenIn.data_ptr(), tenVer.data_ptr(), tenHor.data_ptr(), tenOutgrad.data_ptr(), None, tenVergrad.data_ptr(), None]
+                args=[cuda_int32(tenVergrad.nelement()), tenIn.data_ptr(), tenVer.data_ptr(), tenHor.data_ptr(), tenOutgrad.data_ptr(), None, tenVergrad.data_ptr(), None],
+                stream=collections.namedtuple('Stream', 'ptr')(torch.cuda.current_stream().cuda_stream)
             )
         # end
 
@@ -415,7 +458,8 @@ class sepconv_func(torch.autograd.Function):
             }))(
                 grid=tuple([int((tenHorgrad.nelement() + 512 - 1) / 512), 1, 1]),
                 block=tuple([512, 1, 1]),
-                args=[cuda_int32(tenHorgrad.nelement()), tenIn.data_ptr(), tenVer.data_ptr(), tenHor.data_ptr(), tenOutgrad.data_ptr(), None, None, tenHorgrad.data_ptr()]
+                args=[cuda_int32(tenHorgrad.nelement()), tenIn.data_ptr(), tenVer.data_ptr(), tenHor.data_ptr(), tenOutgrad.data_ptr(), None, None, tenHorgrad.data_ptr()],
+                stream=collections.namedtuple('Stream', 'ptr')(torch.cuda.current_stream().cuda_stream)
             )
         # end
 
