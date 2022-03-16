@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 
-import torch
-
 import getopt
 import math
 import numpy
-import os
 import PIL
 import PIL.Image
 import sys
+import torch
 import typing
 
 import sepconv # the custom separable convolution layer
@@ -105,7 +103,7 @@ class Basic(torch.nn.Module):
 
                     def forward(self, tenIn:torch.Tensor) -> torch.Tensor:
                         if self.strType == 'nearest':
-                            return torch.nn.functional.interpolate(input=tenIn, scale_factor=2.0, mode='nearest', align_corners=False)
+                            return torch.nn.functional.interpolate(input=tenIn, scale_factor=2.0, mode='nearest-exact', align_corners=False)
 
                         elif self.strType == 'bilinear':
                             return torch.nn.functional.interpolate(input=tenIn, scale_factor=2.0, mode='bilinear', align_corners=False)
