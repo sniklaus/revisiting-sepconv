@@ -51,7 +51,38 @@ class Basic(torch.nn.Module):
         fltStride = 1.0
 
         for intPart, strPart in enumerate(self.strType.split('+')[0].split('-')):
-            if strPart.startswith('conv') == True:
+            if strPart.startswith('evenize') == True and intPart == 0:
+                class Evenize(torch.nn.Module):
+                    def __init__(self, strPad):
+                        super().__init__()
+
+                        self.strPad = strPad
+                    # end
+
+                    def forward(self, tenIn:torch.Tensor) -> torch.Tensor:
+                        intPad = [0, 0, 0, 0]
+
+                        if tenIn.shape[3] % 2 != 0: intPad[1] = 1
+                        if tenIn.shape[2] % 2 != 0: intPad[3] = 1
+
+                        if min(intPad) != 0 or max(intPad) != 0:
+                            tenIn = torch.nn.functional.pad(input=tenIn, pad=intPad, mode=self.strPad if self.strPad != 'zeros' else 'constant', value=0.0)
+                        # end
+
+                        return tenIn
+                    # end
+                # end
+
+                strPad = 'zeros'
+
+                if '(' in strPart:
+                    if 'replpad' in strPart.split('(')[1].split(')')[0].split(','): strPad = 'replicate'
+                    if 'reflpad' in strPart.split('(')[1].split(')')[0].split(','): strPad = 'reflect'
+                # end
+
+                self.netEvenize = Evenize(strPad)
+
+            elif strPart.startswith('conv') == True:
                 intKsize = 3
                 intPad = 1
                 strPad = 'zeros'
@@ -374,34 +405,29 @@ class Network(torch.nn.Module):
         self.load_state_dict(torch.hub.load_state_dict_from_url(url='http://content.sniklaus.com/resepconv/network-' + arguments_strModel + '.pytorch', file_name='resepconv-' + arguments_strModel))
     # end
 
-    def forward(self, tenSeq):
-        assert(len(tenSeq) == 2)
-
-        tenOne = tenSeq[0]
-        tenTwo = tenSeq[1]
+    def forward(self, tenOne, tenTwo):
+        tenSone = torch.nn.functional.pad(input=torch.cat([tenOne, tenOne.new_ones([tenOne.shape[0], 1, tenOne.shape[2], tenOne.shape[3]])], 1), pad=[int(math.floor(0.5 * 51)), int(math.floor(0.5 * 51)), int(math.floor(0.5 * 51)), int(math.floor(0.5 * 51))], mode='replicate')
+        tenStwo = torch.nn.functional.pad(input=torch.cat([tenTwo, tenTwo.new_ones([tenTwo.shape[0], 1, tenTwo.shape[2], tenTwo.shape[3]])], 1), pad=[int(math.floor(0.5 * 51)), int(math.floor(0.5 * 51)), int(math.floor(0.5 * 51)), int(math.floor(0.5 * 51))], mode='replicate')
 
         with torch.set_grad_enabled(False):
-            tenStack = torch.stack(tenSeq, 1)
-            tenMean = tenStack.view(tenStack.shape[0], -1).mean(1, True).view(tenStack.shape[0], 1, 1, 1)
-            tenStd = tenStack.view(tenStack.shape[0], -1).std(1, True).view(tenStack.shape[0], 1, 1, 1)
-            tenSeq = [(tenFrame - tenMean) / (tenStd + 0.0000001) for tenFrame in tenSeq]
-            tenSeq = [tenFrame.detach() for tenFrame in tenSeq]
+            tenStats = [tenOne, tenTwo]
+            tenMean = sum([tenIn.mean([1, 2, 3], True) for tenIn in tenStats]) / len(tenStats)
+            tenStd = (sum([tenIn.std([1, 2, 3], False, True).square() + (tenMean - tenIn.mean([1, 2, 3], True)).square() for tenIn in tenStats]) / len(tenStats)).sqrt()
+            tenOne = ((tenOne - tenMean) / (tenStd + 0.0000001)).detach()
+            tenTwo = ((tenTwo - tenMean) / (tenStd + 0.0000001)).detach()
         # end
 
-        tenOut = self.netDecode(self.netEncode([torch.cat([self.netInput(tenSeq[0]), self.netInput(tenSeq[1])], 1)] + ([0.0] * (len(self.intChannels) - 1))))[1]
-
-        tenOne = torch.nn.functional.pad(input=tenOne, pad=[int(math.floor(0.5 * 51)), int(math.floor(0.5 * 51)), int(math.floor(0.5 * 51)), int(math.floor(0.5 * 51))], mode='replicate')
-        tenTwo = torch.nn.functional.pad(input=tenTwo, pad=[int(math.floor(0.5 * 51)), int(math.floor(0.5 * 51)), int(math.floor(0.5 * 51)), int(math.floor(0.5 * 51))], mode='replicate')
-
-        tenOne = torch.cat([tenOne, tenOne.new_ones([tenOne.shape[0], 1, tenOne.shape[2], tenOne.shape[3]])], 1).detach()
-        tenTwo = torch.cat([tenTwo, tenTwo.new_ones([tenTwo.shape[0], 1, tenTwo.shape[2], tenTwo.shape[3]])], 1).detach()
+        tenOut = self.netDecode(self.netEncode([torch.cat([self.netInput(tenOne), self.netInput(tenTwo)], 1)] + ([0.0] * (len(self.intChannels) - 1))))[1]
 
         tenVerone = self.netVerone(tenOut)
         tenVertwo = self.netVertwo(tenOut)
         tenHorone = self.netHorone(tenOut)
         tenHortwo = self.netHortwo(tenOut)
 
-        tenOut = sepconv.sepconv_func.apply(tenOne, tenVerone, tenHorone) + sepconv.sepconv_func.apply(tenTwo, tenVertwo, tenHortwo)
+        tenOut = sum([
+            sepconv.sepconv_func.apply(tenSone.detach(), tenVerone, tenHorone),
+            sepconv.sepconv_func.apply(tenStwo.detach(), tenVertwo, tenHortwo)
+        ])
 
         tenNormalize = tenOut[:, -1:, :, :]
         tenNormalize[tenNormalize.abs() < 0.01] = 1.0
@@ -440,7 +466,7 @@ def estimate(tenOne, tenTwo):
     tenPreprocessedOne = torch.nn.functional.pad(input=tenPreprocessedOne, pad=[0, intPadr, 0, intPadb], mode='replicate')
     tenPreprocessedTwo = torch.nn.functional.pad(input=tenPreprocessedTwo, pad=[0, intPadr, 0, intPadb], mode='replicate')
 
-    return netNetwork([tenPreprocessedOne, tenPreprocessedTwo])[0, :, :intHeight, :intWidth].cpu()
+    return netNetwork(tenPreprocessedOne, tenPreprocessedTwo)[0, :, :intHeight, :intWidth].cpu()
 # end
 
 ##########################################################
