@@ -381,21 +381,19 @@ class Network(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.intEncdec = [1, 1]
-        self.intChannels = [32, 64, 128, 256, 512]
-
         self.objScratch = {}
+
+        self.intChannels = [32, 64, 128, 256, 512]
 
         self.netInput = torch.nn.Conv2d(in_channels=3, out_channels=int(round(0.5 * self.intChannels[0])), kernel_size=3, stride=1, padding=1, padding_mode='zeros')
 
-        self.netEncode = torch.nn.Sequential(*(
-            [Encode([0] * len(self.intChannels), self.intChannels, 'prelu(0.25)-conv(3)-prelu(0.25)-conv(3)+skip', 'prelu(0.25)-sconv(3)-prelu(0.25)-conv(3)', self.objScratch)] +
-            [Encode(self.intChannels, self.intChannels, 'prelu(0.25)-conv(3)-prelu(0.25)-conv(3)+skip', 'prelu(0.25)-sconv(3)-prelu(0.25)-conv(3)', self.objScratch) for intEncdec in range(1, self.intEncdec[0])]
-        ))
+        self.netEncode = torch.nn.Sequential(
+            Encode([0] * len(self.intChannels), self.intChannels, 'prelu(0.25)-conv(3)-prelu(0.25)-conv(3)+skip', 'prelu(0.25)-sconv(3)-prelu(0.25)-conv(3)', self.objScratch)
+        )
 
-        self.netDecode = torch.nn.Sequential(*(
-            [Decode([0] + self.intChannels[1:], [0] + self.intChannels[1:], 'prelu(0.25)-conv(3)-prelu(0.25)-conv(3)+skip', 'prelu(0.25)-up(bilinear)-conv(3)-prelu(0.25)-conv(3)', self.objScratch) for intEncdec in range(0, self.intEncdec[1])]
-        ))
+        self.netDecode = torch.nn.Sequential(
+            Decode([0] + self.intChannels[1:], [0] + self.intChannels[1:], 'prelu(0.25)-conv(3)-prelu(0.25)-conv(3)+skip', 'prelu(0.25)-up(bilinear)-conv(3)-prelu(0.25)-conv(3)', self.objScratch)
+        )
 
         self.netVerone = Basic('up(bilinear)-conv(3)-prelu(0.25)-conv(3)', [self.intChannels[1], self.intChannels[1], 51])
         self.netVertwo = Basic('up(bilinear)-conv(3)-prelu(0.25)-conv(3)', [self.intChannels[1], self.intChannels[1], 51])
