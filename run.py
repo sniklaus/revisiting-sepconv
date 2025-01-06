@@ -97,12 +97,9 @@ class Basic(torch.nn.Module):
                     intKsize = int(strPart.split('(')[1].split(')')[0].split(',')[0])
                     intPad = int(math.floor(0.5 * (intKsize - 1)))
 
+                    if 'nopad' in strPart.split('(')[1].split(')')[0].split(','): intPad = 0
                     if 'replpad' in strPart.split('(')[1].split(')')[0].split(','): strPad = 'replicate'
                     if 'reflpad' in strPart.split('(')[1].split(')')[0].split(','): strPad = 'reflect'
-                # end
-
-                if 'nopad' in self.strType.split('+'):
-                    intPad = 0
                 # end
 
                 netMain += [torch.nn.Conv2d(in_channels=intChans[0], out_channels=intChans[1], kernel_size=intKsize, stride=1, padding=intPad, padding_mode=strPad, bias='nobias' not in self.strType.split('+'))]
@@ -111,24 +108,23 @@ class Basic(torch.nn.Module):
 
             elif strPart.startswith('sconv') == True:
                 intKsize = 3
+                intStride = 2
                 intPad = 1
                 strPad = 'zeros'
 
                 if '(' in strPart:
                     intKsize = int(strPart.split('(')[1].split(')')[0].split(',')[0])
+                    intStride = int(strPart.split('(')[1].split(')')[0].split(',')[1])
                     intPad = int(math.floor(0.5 * (intKsize - 1)))
 
+                    if 'nopad' in strPart.split('(')[1].split(')')[0].split(','): intPad = 0
                     if 'replpad' in strPart.split('(')[1].split(')')[0].split(','): strPad = 'replicate'
                     if 'reflpad' in strPart.split('(')[1].split(')')[0].split(','): strPad = 'reflect'
                 # end
 
-                if 'nopad' in self.strType.split('+'):
-                    intPad = 0
-                # end
-
-                netMain += [torch.nn.Conv2d(in_channels=intChans[0], out_channels=intChans[1], kernel_size=intKsize, stride=2, padding=intPad, padding_mode=strPad, bias='nobias' not in self.strType.split('+'))]
+                netMain += [torch.nn.Conv2d(in_channels=intChans[0], out_channels=intChans[1], kernel_size=intKsize, stride=intStride, padding=intPad, padding_mode=strPad, bias='nobias' not in self.strType.split('+'))]
                 intChans = intChans[1:]
-                fltStride *= 2.0
+                fltStride *= intStride
 
             elif strPart.startswith('up') == True:
                 class Up(torch.nn.Module):
@@ -140,7 +136,7 @@ class Basic(torch.nn.Module):
 
                     def forward(self, tenIn:torch.Tensor) -> torch.Tensor:
                         if self.strType == 'nearest':
-                            return torch.nn.functional.interpolate(input=tenIn, scale_factor=2.0, mode='nearest-exact', align_corners=False)
+                            return torch.nn.functional.interpolate(input=tenIn, scale_factor=2.0, mode='nearest-exact')
 
                         elif self.strType == 'bilinear':
                             return torch.nn.functional.interpolate(input=tenIn, scale_factor=2.0, mode='bilinear', align_corners=False)
@@ -394,7 +390,7 @@ class Network(torch.nn.Module):
         self.netInput = torch.nn.Conv2d(in_channels=3, out_channels=int(round(0.5 * self.intChannels[0])), kernel_size=3, stride=1, padding=1, padding_mode='zeros')
 
         self.netEncode = torch.nn.Sequential(
-            Encode([0] * len(self.intChannels), self.intChannels, 'prelu(0.25)-conv(3)-prelu(0.25)-conv(3)+skip', 'prelu(0.25)-sconv(3)-prelu(0.25)-conv(3)', self.objScratch)
+            Encode([0] * len(self.intChannels), self.intChannels, 'prelu(0.25)-conv(3)-prelu(0.25)-conv(3)+skip', 'prelu(0.25)-sconv(3,2)-prelu(0.25)-conv(3)', self.objScratch)
         )
 
         self.netDecode = torch.nn.Sequential(
@@ -449,7 +445,7 @@ def estimate(tenOne, tenTwo):
     global netNetwork
 
     if netNetwork is None:
-        netNetwork = Network().cuda().eval()
+        netNetwork = Network().cuda().train(False)
     # end
 
     assert(tenOne.shape[1] == tenTwo.shape[1])
@@ -482,14 +478,12 @@ if __name__ == '__main__':
 
         tenOutput = estimate(tenOne, tenTwo)
 
-        PIL.Image.fromarray((tenOutput.clip(0.0, 1.0).numpy().transpose(1, 2, 0)[:, :, ::-1] * 255.0).astype(numpy.uint8)).save(args_strOut)
+        PIL.Image.fromarray((tenOutput.clip(0.0, 1.0).numpy(force=True).transpose(1, 2, 0)[:, :, ::-1] * 255.0).astype(numpy.uint8)).save(args_strOut)
 
     elif args_strOut.split('.')[-1] in ['avi', 'mp4', 'webm', 'wmv']:
         import moviepy
-        import moviepy.editor
-        import moviepy.video.io.ffmpeg_writer
 
-        objVideoreader = moviepy.editor.VideoFileClip(filename=args_strVideo)
+        objVideoreader = moviepy.VideoFileClip(filename=args_strVideo)
 
         intWidth = objVideoreader.w
         intHeight = objVideoreader.h
@@ -505,10 +499,10 @@ if __name__ == '__main__':
                     tenFrames[1] = estimate(tenFrames[0], tenFrames[2])
                     tenFrames[3] = estimate(tenFrames[2], tenFrames[4])
 
-                    objVideowriter.write_frame((tenFrames[0].clip(0.0, 1.0).numpy().transpose(1, 2, 0)[:, :, ::-1] * 255.0).astype(numpy.uint8))
-                    objVideowriter.write_frame((tenFrames[1].clip(0.0, 1.0).numpy().transpose(1, 2, 0)[:, :, ::-1] * 255.0).astype(numpy.uint8))
-                    objVideowriter.write_frame((tenFrames[2].clip(0.0, 1.0).numpy().transpose(1, 2, 0)[:, :, ::-1] * 255.0).astype(numpy.uint8))
-                    objVideowriter.write_frame((tenFrames[3].clip(0.0, 1.0).numpy().transpose(1, 2, 0)[:, :, ::-1] * 255.0).astype(numpy.uint8))
+                    objVideowriter.write_frame((tenFrames[0].clip(0.0, 1.0).numpy(force=True).transpose(1, 2, 0)[:, :, ::-1] * 255.0).astype(numpy.uint8))
+                    objVideowriter.write_frame((tenFrames[1].clip(0.0, 1.0).numpy(force=True).transpose(1, 2, 0)[:, :, ::-1] * 255.0).astype(numpy.uint8))
+                    objVideowriter.write_frame((tenFrames[2].clip(0.0, 1.0).numpy(force=True).transpose(1, 2, 0)[:, :, ::-1] * 255.0).astype(numpy.uint8))
+                    objVideowriter.write_frame((tenFrames[3].clip(0.0, 1.0).numpy(force=True).transpose(1, 2, 0)[:, :, ::-1] * 255.0).astype(numpy.uint8))
                 # end
 
                 tenFrames[0] = torch.FloatTensor(numpy.ascontiguousarray(npyFrame[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0)))

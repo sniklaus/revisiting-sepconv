@@ -1,7 +1,7 @@
 # revisiting-sepconv
 This is a reference implementation of Revisiting Adaptive Convolutions for Video Frame Interpolation [1] using PyTorch. Given two frames, it will make use of [adaptive convolution](http://sniklaus.com/papers/adaconv) [2] in a [separable manner](http://sniklaus.com/papers/sepconv) [3] to interpolate the intermediate frame. Should you be making use of our work, please cite our paper [1].
 
-<a href="https://arxiv.org/abs/2011.01280" rel="Paper"><img src="http://content.sniklaus.com/resepconv/paper.jpg" alt="Paper" width="100%"></a>
+<a href="https://arxiv.org/abs/2011.01280"><img src="http://content.sniklaus.com/resepconv/paper.jpg" alt="Paper" width="100%"></a>
 
 For the original SepConv, see: https://github.com/sniklaus/sepconv-slomo
 <br />
@@ -28,7 +28,7 @@ python run.py --model paper --video ./videos/car-turn.mp4 --out ./out.mp4
 For a quick benchmark using examples from the Middlebury benchmark for optical flow, run `python benchmark.py`. You can use it to easily verify that the provided implementation runs as expected.
 
 ## video
-<a href="http://content.sniklaus.com/resepconv/video.mp4" rel="Video"><img src="http://content.sniklaus.com/resepconv/video.jpg" alt="Video" width="100%"></a>
+<a href="http://content.sniklaus.com/resepconv/video.mp4"><img src="http://content.sniklaus.com/resepconv/video.jpg" alt="Video" width="100%"></a>
 
 ## license
 Please refer to the appropriate file within this repository.
