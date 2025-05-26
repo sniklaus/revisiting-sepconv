@@ -233,6 +233,10 @@ class sepconv_func(torch.autograd.Function):
     @staticmethod
     @torch.amp.custom_fwd(device_type='cuda', cast_inputs=torch.float32)
     def forward(self, tenIn, tenVer, tenHor):
+        tenIn = tenIn.float() # manual cast in case amp is not enabled
+        tenVer = tenVer.float() # manual cast in case amp is not enabled
+        tenHor = tenHor.float() # manual cast in case amp is not enabled
+
         tenOut = tenIn.new_zeros([tenIn.shape[0], tenIn.shape[1], tenVer.shape[2] and tenHor.shape[2], tenVer.shape[3] and tenHor.shape[3]])
 
         if tenIn.is_cuda == True:
