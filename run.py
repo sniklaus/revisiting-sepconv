@@ -9,7 +9,7 @@ import sys
 import torch
 import typing
 
-import sepconv # the custom separable convolution layer
+import sepconv_native # the custom separable convolution layer
 
 ##########################################################
 
@@ -425,8 +425,8 @@ class Network(torch.nn.Module):
         tenHortwo = self.netHortwo(tenOut)
 
         tenOut = sum([
-            sepconv.sepconv_func.apply(tenSone.detach(), tenVerone, tenHorone),
-            sepconv.sepconv_func.apply(tenStwo.detach(), tenVertwo, tenHortwo)
+            sepconv_native.sepconv_func.apply(tenSone.detach(), tenVerone, tenHorone),
+            sepconv_native.sepconv_func.apply(tenStwo.detach(), tenVertwo, tenHortwo)
         ])
 
         tenNormalize = tenOut[:, -1:, :, :]
